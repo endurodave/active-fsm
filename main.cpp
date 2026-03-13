@@ -60,10 +60,12 @@ int main()
                 cerr << "  [CANNOT_HAPPEN from state " << (int)state << "]" << endl;
             })));
 
-    auto d1 = std::make_shared<MotorData>(); d1->speed = 100;
+    // xmake_shared falls back to std::make_shared when DMQ_ALLOCATOR is disabled
+    // xmake_shared uses the fixed-block pool allocator when DMQ_ALLOCATOR is enabled
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     syncMotor.SetSpeed(d1);   // blocks — state executes before returning
 
-    auto d2 = std::make_shared<MotorData>(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     syncMotor.SetSpeed(d2);
 
     syncMotor.Halt();
