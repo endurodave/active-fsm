@@ -1,7 +1,7 @@
 #ifndef _SELF_TEST_H
 #define _SELF_TEST_H
 
-#include "StateMachine.h"
+#include "state-machine/StateMachine.h"
 
 /// @brief SelfTest is a subclass state machine for other self tests to
 /// inherit from. The class has common states for all derived classes to share.
@@ -23,12 +23,12 @@ protected:
     };
 
     // States
-    void ST_Idle(const NoEventData* data);
-    void ST_Completed(const NoEventData* data);
-    void ST_Failed(const NoEventData* data);
+    STATE_DECLARE(SelfTest, Idle, NoEventData)
+    STATE_DECLARE(SelfTest, Completed, NoEventData)
+    STATE_DECLARE(SelfTest, Failed, NoEventData)
 
     // Entry
-    void EN_EntryIdle(const NoEventData* data);
+    ENTRY_DECLARE(SelfTest, EntryIdle, NoEventData)
 };
 
 #endif

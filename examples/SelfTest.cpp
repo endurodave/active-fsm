@@ -2,15 +2,10 @@
 #include <iostream>
 
 using namespace std;
-using namespace dmq;
 
 SelfTest::SelfTest(uint8_t maxStates) :
     StateMachine(maxStates)
 {
-    m_stateMap[ST_IDLE].action      += MakeStateDelegate(this, &SelfTest::ST_Idle);
-    m_stateMap[ST_IDLE].entry       += MakeStateDelegate(this, &SelfTest::EN_EntryIdle);
-    m_stateMap[ST_COMPLETED].action += MakeStateDelegate(this, &SelfTest::ST_Completed);
-    m_stateMap[ST_FAILED].action    += MakeStateDelegate(this, &SelfTest::ST_Failed);
 }
 
 void SelfTest::Cancel()
@@ -24,23 +19,23 @@ void SelfTest::Cancel()
     END_TRANSITION_MAP(nullptr)
 }
 
-void SelfTest::ST_Idle(const NoEventData* data)
+STATE_DEFINE(SelfTest, Idle, NoEventData)
 {
     cout << "SelfTest::ST_Idle" << endl;
 }
 
-void SelfTest::EN_EntryIdle(const NoEventData* data)
+ENTRY_DEFINE(SelfTest, EntryIdle, NoEventData)
 {
     cout << "SelfTest::EN_EntryIdle" << endl;
 }
 
-void SelfTest::ST_Completed(const NoEventData* data)
+STATE_DEFINE(SelfTest, Completed, NoEventData)
 {
     cout << "SelfTest::ST_Completed" << endl;
     InternalEvent(ST_IDLE);
 }
 
-void SelfTest::ST_Failed(const NoEventData* data)
+STATE_DEFINE(SelfTest, Failed, NoEventData)
 {
     cout << "SelfTest::ST_Failed" << endl;
     InternalEvent(ST_IDLE);

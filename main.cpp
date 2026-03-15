@@ -1,18 +1,41 @@
-#include "Motor.h"
-#include "Player.h"
-#include "CentrifugeTest.h"
+// main.cpp
+// Example driver exercising the delegate-based FSM framework.
+// Demonstrates synchronous, asynchronous active-object, and polling patterns
+// using Motor, Player, and CentrifugeTest state machines.
+// @see https://github.com/endurodave/StateMachine
+// David Lafreniere
+
+#include "examples/Motor.h"
+#include "examples/Player.h"
+#include "examples/CentrifugeTest.h"
+#include "unit-tests/StateMachineTests.h"
 #include "delegate-mq/DelegateMQ.h"
 #include "delegate-mq/predef/util/Fault.h"
+#include "delegate-mq/predef/util/Timer.h"
 #include <iostream>
-
-// @see https://github.com/endurodave/delegate-fsm
-// David Lafreniere
+#include <atomic>
+#include <future>
+#include <thread>
+#include <chrono>
 
 using namespace std;
 using namespace dmq;
 
+std::atomic<bool> processTimerExit = false;
+
+void ProcessTimers()
+{
+    while (!processTimerExit.load())
+    {
+        // Process all delegate-based timers
+        Timer::ProcessTimers();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+}
+
 int main()
 {
+    std::thread timerThread(ProcessTimers);
     // -----------------------------------------------------------------------
     // Synchronous Motor — ExternalEvent runs on the caller's thread.
     // SetSpeed/Halt block until the state action completes before returning.
@@ -20,14 +43,6 @@ int main()
     cout << "=== Synchronous Motor ===" << endl;
 
     Motor syncMotor;
-
-    // Validate that every state has an action registered. Call once after
-    // construction, before the first event, to catch states added to the enum
-    // but never wired up in the constructor. The callback receives each
-    // offending state index; ASSERT_TRUE hard-aborts if any are missing.
-    ASSERT_TRUE(syncMotor.Validate([](uint8_t state) {
-        cerr << "  [validate] state " << (int)state << " has no action registered" << endl;
-    }));
 
     // OnTransition fires after every completed state action.
     // fromState == toState indicates a self-transition.
@@ -60,12 +75,10 @@ int main()
                 cerr << "  [CANNOT_HAPPEN from state " << (int)state << "]" << endl;
             })));
 
-    // xmake_shared falls back to std::make_shared when DMQ_ALLOCATOR is disabled
-    // xmake_shared uses the fixed-block pool allocator when DMQ_ALLOCATOR is enabled
-    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
+    auto d1 = new MotorData(); d1->speed = 100;
     syncMotor.SetSpeed(d1);   // blocks — state executes before returning
 
-    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
+    auto d2 = new MotorData(); d2->speed = 200;
     syncMotor.SetSpeed(d2);
 
     syncMotor.Halt();
@@ -92,11 +105,11 @@ int main()
                 cout << "  [async transition " << (int)from << " -> " << (int)to << "]" << endl;
             })));
 
-    auto a1 = std::make_shared<MotorData>(); a1->speed = 100;
+    auto a1 = new MotorData(); a1->speed = 100;
     cout << "Posting SetSpeed(100)..." << endl;
     asyncMotor.SetSpeed(a1);   // returns immediately; SM thread processes asynchronously
 
-    auto a2 = std::make_shared<MotorData>(); a2->speed = 200;
+    auto a2 = new MotorData(); a2->speed = 200;
     cout << "Posting SetSpeed(200)..." << endl;
     asyncMotor.SetSpeed(a2);
 
@@ -130,10 +143,21 @@ int main()
     cout << "\n=== CentrifugeTest ===" << endl;
 
     CentrifugeTest test;
+
+    std::promise<void> testDone;
+    auto testDoneConn = test.OnComplete.Connect(
+        MakeDelegate(std::function<void()>([&testDone]() {
+            testDone.set_value();
+        })));
+
     test.Cancel();
     test.Start();
-    while (test.IsPollActive())
-        test.Poll();
+    testDone.get_future().get();   // blocks until OnComplete fires on SM thread
+
+    processTimerExit = true;
+    timerThread.join();
+
+    RunStateMachineTests();
 
     return 0;
 }

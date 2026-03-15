@@ -1,7 +1,7 @@
 #ifndef _PLAYER_H
 #define _PLAYER_H
 
-#include "StateMachine.h"
+#include "state-machine/StateMachine.h"
 
 class Player : public StateMachine
 {
@@ -26,11 +26,20 @@ private:
     };
 
     // States
-    void ST_Empty(const NoEventData* data);
-    void ST_Open(const NoEventData* data);
-    void ST_Stopped(const NoEventData* data);
-    void ST_Paused(const NoEventData* data);
-    void ST_Playing(const NoEventData* data);
+    STATE_DECLARE(Player, Empty, NoEventData)
+    STATE_DECLARE(Player, Open, NoEventData)
+    STATE_DECLARE(Player, Stopped, NoEventData)
+    STATE_DECLARE(Player, Paused, NoEventData)
+    STATE_DECLARE(Player, Playing, NoEventData)
+
+    // State map
+    BEGIN_STATE_MAP_EX
+        STATE_MAP_ENTRY_EX(&Empty)
+        STATE_MAP_ENTRY_EX(&Open)
+        STATE_MAP_ENTRY_EX(&Stopped)
+        STATE_MAP_ENTRY_EX(&Paused)
+        STATE_MAP_ENTRY_EX(&Playing)
+    END_STATE_MAP_EX
 };
 
 #endif

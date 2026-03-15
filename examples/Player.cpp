@@ -2,16 +2,10 @@
 #include <iostream>
 
 using namespace std;
-using namespace dmq;
 
 Player::Player() :
     StateMachine(ST_MAX_STATES)
 {
-    m_stateMap[ST_EMPTY].action   += MakeStateDelegate(this, &Player::ST_Empty);
-    m_stateMap[ST_OPEN].action    += MakeStateDelegate(this, &Player::ST_Open);
-    m_stateMap[ST_STOPPED].action += MakeStateDelegate(this, &Player::ST_Stopped);
-    m_stateMap[ST_PAUSED].action  += MakeStateDelegate(this, &Player::ST_Paused);
-    m_stateMap[ST_PLAYING].action += MakeStateDelegate(this, &Player::ST_Playing);
 }
 
 void Player::OpenClose()
@@ -69,7 +63,7 @@ void Player::EndPause()
     END_TRANSITION_MAP(nullptr)
 }
 
-void Player::ST_Empty(const NoEventData* data)
+STATE_DEFINE(Player, Empty, NoEventData)
 {
     static bool CD_DetectedToggle = false;
     CD_DetectedToggle = !CD_DetectedToggle;
@@ -79,22 +73,22 @@ void Player::ST_Empty(const NoEventData* data)
         InternalEvent(ST_STOPPED);
 }
 
-void Player::ST_Open(const NoEventData* data)
+STATE_DEFINE(Player, Open, NoEventData)
 {
     cout << "Player::ST_Open" << endl;
 }
 
-void Player::ST_Stopped(const NoEventData* data)
+STATE_DEFINE(Player, Stopped, NoEventData)
 {
     cout << "Player::ST_Stopped" << endl;
 }
 
-void Player::ST_Paused(const NoEventData* data)
+STATE_DEFINE(Player, Paused, NoEventData)
 {
     cout << "Player::ST_Paused" << endl;
 }
 
-void Player::ST_Playing(const NoEventData* data)
+STATE_DEFINE(Player, Playing, NoEventData)
 {
     cout << "Player::ST_Playing" << endl;
 }

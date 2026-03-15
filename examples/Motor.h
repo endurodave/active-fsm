@@ -1,7 +1,7 @@
 #ifndef _MOTOR_H
 #define _MOTOR_H
 
-#include "StateMachine.h"
+#include "state-machine/StateMachine.h"
 
 class MotorData : public EventData
 {
@@ -14,7 +14,8 @@ class Motor : public StateMachine
 public:
     Motor();
 
-    void SetSpeed(std::shared_ptr<MotorData> data);
+    // External events
+    void SetSpeed(const MotorData* data);
     void Halt();
 
 private:
@@ -29,11 +30,19 @@ private:
         ST_MAX_STATES
     };
 
-    // States
-    void ST_Idle(const NoEventData* data);
-    void ST_Stop(const NoEventData* data);
-    void ST_Start(const MotorData* data);
-    void ST_ChangeSpeed(const MotorData* data);
+    // State functions
+    STATE_DECLARE(Motor, Idle, NoEventData)
+    STATE_DECLARE(Motor, Stop, NoEventData)
+    STATE_DECLARE(Motor, Start, MotorData)
+    STATE_DECLARE(Motor, ChangeSpeed, MotorData)
+
+    // State map
+    BEGIN_STATE_MAP_EX
+        STATE_MAP_ENTRY_EX(&Idle)
+        STATE_MAP_ENTRY_EX(&Stop)
+        STATE_MAP_ENTRY_EX(&Start)
+        STATE_MAP_ENTRY_EX(&ChangeSpeed)
+    END_STATE_MAP_EX
 };
 
 #endif

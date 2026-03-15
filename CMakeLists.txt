@@ -23,17 +23,20 @@ set(DMQ_TRANSPORT "DMQ_TRANSPORT_NONE")
 include("${CMAKE_SOURCE_DIR}/delegate-mq/DelegateMQ.cmake")
 
 # Collect project source files
-file(GLOB SOURCES         "${CMAKE_SOURCE_DIR}/main.cpp")
-file(GLOB SM_SOURCES      "${CMAKE_SOURCE_DIR}/state-machine/*.cpp"
-                          "${CMAKE_SOURCE_DIR}/state-machine/*.h")
+file(GLOB SOURCES      "${CMAKE_SOURCE_DIR}/main.cpp")
+file(GLOB SM_SOURCES   "${CMAKE_SOURCE_DIR}/state-machine/*.cpp"
+                       "${CMAKE_SOURCE_DIR}/state-machine/*.h")
 file(GLOB EXAMPLE_SOURCES "${CMAKE_SOURCE_DIR}/examples/*.cpp"
                           "${CMAKE_SOURCE_DIR}/examples/*.h")
+file(GLOB TEST_SOURCES "${CMAKE_SOURCE_DIR}/unit-tests/*.cpp"
+                       "${CMAKE_SOURCE_DIR}/unit-tests/*.h")
 
-list(APPEND SOURCES ${SM_SOURCES} ${EXAMPLE_SOURCES} ${DMQ_PREDEF_SOURCES})
+list(APPEND SOURCES ${SM_SOURCES} ${EXAMPLE_SOURCES} ${TEST_SOURCES} ${DMQ_PREDEF_SOURCES})
 
 # Organize files in IDE (Visual Studio Solution Explorer)
 source_group("State Machine"   FILES ${SM_SOURCES})
 source_group("Examples"        FILES ${EXAMPLE_SOURCES})
+source_group("Unit Tests"      FILES ${TEST_SOURCES})
 source_group("Delegate Files"  FILES ${DMQ_LIB_SOURCES})
 source_group("Predef Files"    FILES ${DMQ_PREDEF_SOURCES})
 

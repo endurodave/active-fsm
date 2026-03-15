@@ -6,25 +6,22 @@ using namespace dmq;
 
 CentrifugeTest::CentrifugeTest() :
     SelfTest(ST_MAX_STATES),
-    m_pollActive(false),
+    m_smThread("CentrifugeTestSMThread"),
     m_speed(0)
 {
-    // ST_IDLE: override the base action registered by SelfTest, keeping its entry.
-    m_stateMap[ST_IDLE].action.Clear();
-    m_stateMap[ST_IDLE].action += MakeStateDelegate(this, &CentrifugeTest::ST_Idle);
+    m_smThread.CreateThread();
+    SetThread(m_smThread);
 
-    m_stateMap[ST_START_TEST].action            += MakeStateDelegate(this, &CentrifugeTest::ST_StartTest);
-    m_stateMap[ST_START_TEST].guard              = MakeGuardDelegate(this, &CentrifugeTest::GD_GuardStartTest);
+    // When the poll timer fires (via ProcessTimers on the caller's thread),
+    // dispatch Poll() asynchronously onto the SM thread.
+    m_pollTimerConn = m_pollTimer.OnExpired.Connect(
+        MakeDelegate(this, &CentrifugeTest::Poll, m_smThread));
+}
 
-    m_stateMap[ST_ACCELERATION].action          += MakeStateDelegate(this, &CentrifugeTest::ST_Acceleration);
-
-    m_stateMap[ST_WAIT_FOR_ACCELERATION].action += MakeStateDelegate(this, &CentrifugeTest::ST_WaitForAcceleration);
-    m_stateMap[ST_WAIT_FOR_ACCELERATION].exit   += MakeExitDelegate(this, &CentrifugeTest::EX_ExitWaitForAcceleration);
-
-    m_stateMap[ST_DECELERATION].action          += MakeStateDelegate(this, &CentrifugeTest::ST_Deceleration);
-
-    m_stateMap[ST_WAIT_FOR_DECELERATION].action += MakeStateDelegate(this, &CentrifugeTest::ST_WaitForDeceleration);
-    m_stateMap[ST_WAIT_FOR_DECELERATION].exit   += MakeExitDelegate(this, &CentrifugeTest::EX_ExitWaitForDeceleration);
+CentrifugeTest::~CentrifugeTest()
+{
+    m_pollTimer.Stop();
+    m_smThread.ExitThread();
 }
 
 void CentrifugeTest::Start()
@@ -55,58 +52,59 @@ void CentrifugeTest::Poll()
     END_TRANSITION_MAP(nullptr)
 }
 
-void CentrifugeTest::ST_Idle(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, Idle, NoEventData)
 {
     cout << "CentrifugeTest::ST_Idle" << endl;
     SelfTest::ST_Idle(data);
     StopPoll();
+    OnComplete();
 }
 
-void CentrifugeTest::ST_StartTest(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, StartTest, NoEventData)
 {
     cout << "CentrifugeTest::ST_StartTest" << endl;
     InternalEvent(ST_ACCELERATION);
 }
 
-bool CentrifugeTest::GD_GuardStartTest(const NoEventData* data)
+GUARD_DEFINE(CentrifugeTest, GuardStartTest, NoEventData)
 {
     cout << "CentrifugeTest::GD_GuardStartTest" << endl;
     return m_speed == 0;
 }
 
-void CentrifugeTest::ST_Acceleration(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, Acceleration, NoEventData)
 {
     cout << "CentrifugeTest::ST_Acceleration" << endl;
     StartPoll();
 }
 
-void CentrifugeTest::ST_WaitForAcceleration(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, WaitForAcceleration, NoEventData)
 {
     cout << "CentrifugeTest::ST_WaitForAcceleration : Speed is " << m_speed << endl;
     if (++m_speed >= 5)
         InternalEvent(ST_DECELERATION);
 }
 
-void CentrifugeTest::EX_ExitWaitForAcceleration()
+EXIT_DEFINE(CentrifugeTest, ExitWaitForAcceleration)
 {
     cout << "CentrifugeTest::EX_ExitWaitForAcceleration" << endl;
     StopPoll();
 }
 
-void CentrifugeTest::ST_Deceleration(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, Deceleration, NoEventData)
 {
     cout << "CentrifugeTest::ST_Deceleration" << endl;
     StartPoll();
 }
 
-void CentrifugeTest::ST_WaitForDeceleration(const NoEventData* data)
+STATE_DEFINE(CentrifugeTest, WaitForDeceleration, NoEventData)
 {
     cout << "CentrifugeTest::ST_WaitForDeceleration : Speed is " << m_speed << endl;
     if (m_speed-- == 0)
         InternalEvent(ST_COMPLETED);
 }
 
-void CentrifugeTest::EX_ExitWaitForDeceleration()
+EXIT_DEFINE(CentrifugeTest, ExitWaitForDeceleration)
 {
     cout << "CentrifugeTest::EX_ExitWaitForDeceleration" << endl;
     StopPoll();

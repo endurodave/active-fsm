@@ -2,26 +2,34 @@
 #define _CENTRIFUGE_TEST_H
 
 #include "SelfTest.h"
+#include "delegate-mq/predef/util/Timer.h"
 
-/// @brief CentrifugeTest demonstrates state machine inheritance, state
-/// function override, and guard/entry/exit actions. SelfTest provides the
-/// common base states.
+/// @brief CentrifugeTest demonstrates state machine inheritance, state function
+/// override, guard/entry/exit actions, and timer-driven polling. The SM runs as
+/// an active object on an owned SM thread. A Timer fires Poll() events onto the
+/// SM thread periodically while the test is running.
 class CentrifugeTest : public SelfTest
 {
 public:
     CentrifugeTest();
+    ~CentrifugeTest();
 
     virtual void Start();
-    void Poll();
 
-    bool IsPollActive() { return m_pollActive; }
+    // Fired on the SM thread when the test completes and returns to ST_IDLE.
+    dmq::Signal<void()> OnComplete;
 
 private:
-    bool m_pollActive;
-    int  m_speed;
+    Thread                m_smThread;
+    Timer                 m_pollTimer;
+    dmq::ScopedConnection m_pollTimerConn;
+    int                   m_speed;
 
-    void StartPoll() { m_pollActive = true; }
-    void StopPoll()  { m_pollActive = false; }
+    void StartPoll() { m_pollTimer.Start(std::chrono::milliseconds(10)); }
+    void StopPoll()  { m_pollTimer.Stop(); }
+
+    // Internal poll event — drives state transitions while test is active.
+    void Poll();
 
     enum States
     {
@@ -34,19 +42,31 @@ private:
     };
 
     // States
-    void ST_Idle(const NoEventData* data);
-    void ST_StartTest(const NoEventData* data);
-    void ST_Acceleration(const NoEventData* data);
-    void ST_WaitForAcceleration(const NoEventData* data);
-    void ST_Deceleration(const NoEventData* data);
-    void ST_WaitForDeceleration(const NoEventData* data);
+    STATE_DECLARE(CentrifugeTest, Idle, NoEventData)
+    STATE_DECLARE(CentrifugeTest, StartTest, NoEventData)
+    STATE_DECLARE(CentrifugeTest, Acceleration, NoEventData)
+    STATE_DECLARE(CentrifugeTest, WaitForAcceleration, NoEventData)
+    STATE_DECLARE(CentrifugeTest, Deceleration, NoEventData)
+    STATE_DECLARE(CentrifugeTest, WaitForDeceleration, NoEventData)
 
     // Guard
-    bool GD_GuardStartTest(const NoEventData* data);
+    GUARD_DECLARE(CentrifugeTest, GuardStartTest, NoEventData)
 
     // Exit
-    void EX_ExitWaitForAcceleration();
-    void EX_ExitWaitForDeceleration();
+    EXIT_DECLARE(CentrifugeTest, ExitWaitForAcceleration)
+    EXIT_DECLARE(CentrifugeTest, ExitWaitForDeceleration)
+
+    // State map
+    BEGIN_STATE_MAP_EX
+        STATE_MAP_ENTRY_ALL_EX(&CentrifugeTest::Idle, nullptr, &SelfTest::EntryIdle, nullptr)
+        STATE_MAP_ENTRY_EX(&SelfTest::Completed)
+        STATE_MAP_ENTRY_EX(&SelfTest::Failed)
+        STATE_MAP_ENTRY_ALL_EX(&StartTest, &GuardStartTest, nullptr, nullptr)
+        STATE_MAP_ENTRY_EX(&Acceleration)
+        STATE_MAP_ENTRY_ALL_EX(&WaitForAcceleration, nullptr, nullptr, &ExitWaitForAcceleration)
+        STATE_MAP_ENTRY_EX(&Deceleration)
+        STATE_MAP_ENTRY_ALL_EX(&WaitForDeceleration, nullptr, nullptr, &ExitWaitForDeceleration)
+    END_STATE_MAP_EX
 };
 
 #endif

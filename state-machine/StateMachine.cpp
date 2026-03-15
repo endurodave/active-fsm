@@ -5,99 +5,254 @@ using namespace dmq;
 //----------------------------------------------------------------------------
 // StateMachine
 //----------------------------------------------------------------------------
-StateMachine::StateMachine(uint8_t maxStates, uint8_t initialState)
-    : m_maxStates(maxStates)
-    , m_currentState(initialState)
-    , m_newState(0)
-    , m_eventGenerated(false)
-    , m_stateMap(maxStates)
+StateMachine::StateMachine(uint8_t maxStates, uint8_t initialState) :
+    MAX_STATES(maxStates),
+    m_currentState(initialState),
+    m_newState(0),
+    m_eventGenerated(false),
+    m_pEventData(nullptr)
 {
-    ASSERT_TRUE(maxStates < EVENT_IGNORED);
-}
+    ASSERT_TRUE(MAX_STATES < EVENT_IGNORED);
+}  
 
 //----------------------------------------------------------------------------
 // ExternalEvent
-//
-// shared_ptr<const EventData> is used rather than a raw pointer for two reasons:
-//   1. Ownership is unambiguous — no heap-allocation contract to document.
-//   2. Async safety — DelegateMQ copies shared_ptr by value across the thread
-//      boundary, keeping the derived type alive without slicing. A raw pointer
-//      would be deep-copied as EventData by make_tuple_heap, losing derived
-//      class data (e.g. MotorData::speed).
 //----------------------------------------------------------------------------
-void StateMachine::ExternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData)
+void StateMachine::ExternalEvent(uint8_t newState, const EventData* pData)
 {
+    // If we are supposed to ignore this event
     if (newState == EVENT_IGNORED)
-        return;
-
-    if (newState == CANNOT_HAPPEN) {
-        OnCannotHappen(m_currentState);
-        ASSERT_TRUE(false);
-        return;
+    {
+#ifndef EXTERNAL_EVENT_NO_HEAP_DATA
+        // Just delete the event data, if any
+        if (pData != nullptr)
+            delete pData;
+#endif
     }
-
-    if (m_smThread)
-        MakeDelegate(this, &StateMachine::ExternalEventImpl, *m_smThread)(newState, pData);
     else
-        ExternalEventImpl(newState, pData);
+    {
+        if (newState == CANNOT_HAPPEN)
+        {
+            OnCannotHappen(m_currentState);
+            ASSERT();
+        }
+
+        if (m_smThread)
+        {
+#ifdef EXTERNAL_EVENT_NO_HEAP_DATA
+            // Cannot use EXTERNAL_EVENT_NO_HEAP_DATA with async dispatch
+            ASSERT();
+#endif
+            // Pass the pointer as a uintptr_t to bypass DelegateMQ's pointer logic.
+            // DelegateMQ will clone the uintptr_t (a number), not the EventData object.
+            // This prevents slicing and double deletion.
+            MakeDelegate(this, &StateMachine::ExternalEventImpl, *m_smThread)(newState, reinterpret_cast<uintptr_t>(pData));
+        }
+        else
+            ExternalEventImpl(newState, reinterpret_cast<uintptr_t>(pData));
+    }
 }
 
 //----------------------------------------------------------------------------
 // ExternalEventImpl
 //----------------------------------------------------------------------------
-void StateMachine::ExternalEventImpl(uint8_t newState, std::shared_ptr<const EventData> pData)
+void StateMachine::ExternalEventImpl(uint8_t newState, uintptr_t pDataPtr)
 {
+    const EventData* pData = reinterpret_cast<const EventData*>(pDataPtr);
+
+#ifdef EXTERNAL_EVENT_NO_HEAP_DATA
+    EventData data;
+    if (pData == nullptr)
+        pData = &data;
+#endif
+    // Generate the event
     InternalEvent(newState, pData);
+
+    // Execute the state engine. This function call will only return
+    // when all state machine events are processed.
     StateEngine();
 }
 
 //----------------------------------------------------------------------------
 // InternalEvent
 //----------------------------------------------------------------------------
-void StateMachine::InternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData)
+void StateMachine::InternalEvent(uint8_t newState, const EventData* pData)
 {
-    if (!pData)
-        pData = std::make_shared<NoEventData>();
+    if (pData == nullptr)
+        pData = new NoEventData();
 
-    m_pEventData     = pData;
+    m_pEventData = pData;
     m_eventGenerated = true;
-    m_newState       = newState;
+    m_newState = newState;
 }
 
 //----------------------------------------------------------------------------
 // StateEngine
 //----------------------------------------------------------------------------
-void StateMachine::StateEngine()
+void StateMachine::StateEngine(void)
 {
-    while (m_eventGenerated) {
-        ASSERT_TRUE(m_newState < m_maxStates);
+    const StateMapRow* pStateMap = GetStateMap();
+    if (pStateMap != nullptr)
+        StateEngine(pStateMap);
+    else
+    {
+        const StateMapRowEx* pStateMapEx = GetStateMapEx();
+        if (pStateMapEx != nullptr)
+            StateEngine(pStateMapEx);
+        else
+            ASSERT();
+    }
+}
 
-        StateMapRow& row   = m_stateMap[m_newState];
-        auto         pData = m_pEventData;
-        m_pEventData       = nullptr;
-        m_eventGenerated   = false;
+//----------------------------------------------------------------------------
+// StateEngine
+//----------------------------------------------------------------------------
+void StateMachine::StateEngine(const StateMapRow* const pStateMap)
+{
+#if EXTERNAL_EVENT_NO_HEAP_DATA
+    bool externalEvent = true;
+#endif
+    const EventData* pDataTemp = nullptr;	
 
-        if (row.guard && !row.guard(pData))
-            continue;
+    // While events are being generated keep executing states
+    while (m_eventGenerated)
+    {
+        // Error check that the new state is valid before proceeding
+        ASSERT_TRUE(m_newState < MAX_STATES);
 
-        const uint8_t fromState = m_currentState;
-        const bool    changing  = (m_newState != m_currentState);
+        // Get the pointer from the state map
+        const StateBase* state = pStateMap[m_newState].State;
 
-        if (changing) {
-            m_stateMap[m_currentState].exit();
-            OnExit(m_currentState);
+        // Copy of event data pointer
+        pDataTemp = m_pEventData;
 
-            m_currentState = m_newState;
-            ASSERT_TRUE(m_eventGenerated == false);
+        // Event data used up, reset the pointer
+        m_pEventData = nullptr;
 
-            row.entry(pData);
-            OnEntry(m_currentState);
-            ASSERT_TRUE(m_eventGenerated == false);
-        } else {
-            m_currentState = m_newState;
+        // Event used up, reset the flag
+        m_eventGenerated = false;
+
+        uint8_t fromState = m_currentState;
+
+        // Switch to the new current state
+        SetCurrentState(m_newState);
+
+        // Execute the state action passing in event data
+        ASSERT_TRUE(state != nullptr);
+        state->InvokeStateAction(this, pDataTemp);
+
+        // Fire transition signal
+        OnTransition(fromState, m_currentState);
+
+        // If event data was used, then delete it
+#if EXTERNAL_EVENT_NO_HEAP_DATA
+        if (pDataTemp)
+        {
+            if (!externalEvent)
+                delete pDataTemp;
+            pDataTemp = nullptr;
+        }
+        externalEvent = false;
+#else
+        if (pDataTemp)
+        {
+            delete pDataTemp;
+            pDataTemp = nullptr;
+        }
+#endif
+    }
+}
+
+//----------------------------------------------------------------------------
+// StateEngine
+//----------------------------------------------------------------------------
+void StateMachine::StateEngine(const StateMapRowEx* const pStateMapEx)
+{
+#if EXTERNAL_EVENT_NO_HEAP_DATA
+    bool externalEvent = true;
+#endif
+    const EventData* pDataTemp = nullptr;
+
+    // While events are being generated keep executing states
+    while (m_eventGenerated)
+    {
+        // Error check that the new state is valid before proceeding
+        ASSERT_TRUE(m_newState < MAX_STATES);
+
+        // Get the pointers from the state map
+        const StateBase* state = pStateMapEx[m_newState].State;
+        const GuardBase* guard = pStateMapEx[m_newState].Guard;
+        const EntryBase* entry = pStateMapEx[m_newState].Entry;
+        const ExitBase* exit = pStateMapEx[m_currentState].Exit;
+
+        // Copy of event data pointer
+        pDataTemp = m_pEventData;
+
+        // Event data used up, reset the pointer
+        m_pEventData = nullptr;
+
+        // Event used up, reset the flag
+        m_eventGenerated = false;
+
+        // Execute the guard condition
+        bool guardResult = true;
+        if (guard != nullptr)
+            guardResult = guard->InvokeGuardCondition(this, pDataTemp);
+
+        // If the guard condition succeeds
+        if (guardResult == true)
+        {
+            uint8_t fromState = m_currentState;
+            // Transitioning to a new state?
+            if (m_newState != m_currentState)
+            {
+                // Execute the state exit action on current state before switching to new state
+                if (exit != nullptr)
+                    exit->InvokeExitAction(this);
+                
+                OnExit(m_currentState);
+
+                // Switch to the new current state
+                SetCurrentState(m_newState);
+
+                // Execute the state entry action on the new state
+                if (entry != nullptr)
+                    entry->InvokeEntryAction(this, pDataTemp);
+
+                OnEntry(m_currentState);
+
+                // Ensure exit/entry actions didn't call InternalEvent by accident 
+                ASSERT_TRUE(m_eventGenerated == false);
+            }
+            else
+            {
+                // Self-transition
+                SetCurrentState(m_newState);
+            }
+
+            // Execute the state action passing in event data
+            ASSERT_TRUE(state != nullptr);
+            state->InvokeStateAction(this, pDataTemp);
+
+            // Fire transition signal
+            OnTransition(fromState, m_currentState);
         }
 
-        row.action(pData);
-        OnTransition(fromState, m_currentState);
+        // If event data was used, then delete it
+#if EXTERNAL_EVENT_NO_HEAP_DATA
+        if (pDataTemp)
+        {
+            if (!externalEvent)
+                delete pDataTemp;
+            pDataTemp = nullptr;
+        }
+        externalEvent = false;
+#else
+        if (pDataTemp)
+        {
+            delete pDataTemp;
+            pDataTemp = nullptr;
+        }
+#endif
     }
 }
