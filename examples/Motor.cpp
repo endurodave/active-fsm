@@ -9,7 +9,7 @@ Motor::Motor() :
 {
 }
 
-void Motor::SetSpeed(const MotorData* data)
+void Motor::SetSpeed(std::shared_ptr<const MotorData> data)
 {
     BEGIN_TRANSITION_MAP                            // - Current State -
         TRANSITION_MAP_ENTRY(ST_START)              // ST_IDLE

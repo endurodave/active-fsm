@@ -15,7 +15,7 @@ public:
     Motor();
 
     // External events
-    void SetSpeed(const MotorData* data);
+    void SetSpeed(std::shared_ptr<const MotorData> data);
     void Halt();
 
 private:

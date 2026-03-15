@@ -164,7 +164,7 @@ static void TestMaxStates()
 static void TestBasicTransition()
 {
     Motor m;
-    auto d = new MotorData(); d->speed = 100;
+    auto d = xmake_shared<MotorData>(); d->speed = 100;
     m.SetSpeed(d);
     ASSERT_TRUE(m.GetCurrentState() == 2);  // ST_START
 }
@@ -172,15 +172,15 @@ static void TestBasicTransition()
 static void TestSelfTransitionDoesNotChangeState()
 {
     Motor m;
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     m.SetSpeed(d1);
     ASSERT_TRUE(m.GetCurrentState() == 2);  // ST_START
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);
     ASSERT_TRUE(m.GetCurrentState() == 3);  // ST_CHANGE_SPEED
 
-    auto d3 = new MotorData(); d3->speed = 300;
+    auto d3 = xmake_shared<MotorData>(); d3->speed = 300;
     m.SetSpeed(d3);
     ASSERT_TRUE(m.GetCurrentState() == 3);  // still ST_CHANGE_SPEED
 }
@@ -190,7 +190,7 @@ static void TestInternalEventChain()
     // Motor::ST_Stop calls InternalEvent(ST_IDLE), so Halt() from START
     // should land in ST_IDLE, not ST_STOP.
     Motor m;
-    auto d = new MotorData(); d->speed = 100;
+    auto d = xmake_shared<MotorData>(); d->speed = 100;
     m.SetSpeed(d);
     ASSERT_TRUE(m.GetCurrentState() == 2);  // ST_START
     m.Halt();
@@ -213,7 +213,7 @@ static void TestOnTransitionSignal()
         MakeDelegate(std::function<void(uint8_t, uint8_t)>(
             [&](uint8_t f, uint8_t t) { capturedFrom = f; capturedTo = t; })));
 
-    auto d = new MotorData(); d->speed = 100;
+    auto d = xmake_shared<MotorData>(); d->speed = 100;
     m.SetSpeed(d);
     ASSERT_TRUE(capturedFrom == 0);  // from ST_IDLE
     ASSERT_TRUE(capturedTo   == 2);  // to ST_START
@@ -227,15 +227,15 @@ static void TestOnEntrySignalFiresOnStateChange()
         MakeDelegate(std::function<void(uint8_t)>(
             [&](uint8_t) { entryCount++; })));
 
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     m.SetSpeed(d1);  // IDLE -> START: entry fires
     ASSERT_TRUE(entryCount == 1);
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);  // START -> CHANGE_SPEED: entry fires
     ASSERT_TRUE(entryCount == 2);
 
-    auto d3 = new MotorData(); d3->speed = 300;
+    auto d3 = xmake_shared<MotorData>(); d3->speed = 300;
     m.SetSpeed(d3);  // CHANGE_SPEED -> CHANGE_SPEED: self-transition, no entry
     ASSERT_TRUE(entryCount == 2);
 }
@@ -248,15 +248,15 @@ static void TestOnExitSignalFiresOnStateChange()
         MakeDelegate(std::function<void(uint8_t)>(
             [&](uint8_t) { exitCount++; })));
 
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     m.SetSpeed(d1);  // IDLE -> START: exit fires for IDLE
     ASSERT_TRUE(exitCount == 1);
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);  // START -> CHANGE_SPEED: exit fires for START
     ASSERT_TRUE(exitCount == 2);
 
-    auto d3 = new MotorData(); d3->speed = 300;
+    auto d3 = xmake_shared<MotorData>(); d3->speed = 300;
     m.SetSpeed(d3);  // CHANGE_SPEED -> CHANGE_SPEED: self-transition, no exit
     ASSERT_TRUE(exitCount == 2);
 }
@@ -270,15 +270,15 @@ static void TestOnTransitionSelfTransition()
         MakeDelegate(std::function<void(uint8_t, uint8_t)>(
             [&](uint8_t, uint8_t) { transCount++; })));
 
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     m.SetSpeed(d1);  // IDLE -> START
     ASSERT_TRUE(transCount == 1);
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);  // START -> CHANGE_SPEED
     ASSERT_TRUE(transCount == 2);
 
-    auto d3 = new MotorData(); d3->speed = 300;
+    auto d3 = xmake_shared<MotorData>(); d3->speed = 300;
     m.SetSpeed(d3);  // CHANGE_SPEED -> CHANGE_SPEED (self-transition still fires)
     ASSERT_TRUE(transCount == 3);
 }
@@ -322,11 +322,11 @@ static void TestMultipleTransitions()
 {
     // Sequence through all Motor states and verify final state.
     Motor m;
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     m.SetSpeed(d1);
     ASSERT_TRUE(m.GetCurrentState() == 2);  // ST_START
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);
     ASSERT_TRUE(m.GetCurrentState() == 3);  // ST_CHANGE_SPEED
 
@@ -403,12 +403,12 @@ static void TestSignalDisconnection()
             MakeDelegate(std::function<void(uint8_t, uint8_t)>(
                 [&](uint8_t, uint8_t) { callCount++; })));
 
-        auto d1 = new MotorData(); d1->speed = 100;
+        auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
         m.SetSpeed(d1);
         ASSERT_TRUE(callCount == 1);
     } // ScopedConnection goes out of scope here
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     m.SetSpeed(d2);
     ASSERT_TRUE(callCount == 1); // should not have incremented
 }

@@ -5,7 +5,7 @@
 
 # State Machine Design in C++
 
-A compact, table-driven C++ finite state machine (FSM) with asynchronous active-object and signal-slot event notification. Runs on embedded and PC targets. 
+A compact, table-driven C++ finite state machine (FSM) with asynchronous active-object and signal-slot event notification. Runs on embedded and PC targets, any operating system.
 
 # Table of Contents
 
@@ -16,6 +16,7 @@ A compact, table-driven C++ finite state machine (FSM) with asynchronous active-
 - [Getting Started](#getting-started)
 - [Introduction](#introduction)
   - [Background](#background)
+  - [State Machine Comparison](#state-machine-comparison)
   - [Why use a state machine?](#why-use-a-state-machine)
 - [State machine design](#state-machine-design)
   - [Internal and external events](#internal-and-external-events)
@@ -56,7 +57,8 @@ The following repositories offer various implementations of finite state machine
 | Project | Description |
 | :--- | :--- |
 | [**State Machine Design in C**](https://github.com/endurodave/C_StateMachine) | A compact C language finite state machine (FSM) implementation. |
-| [**DelegateMQ**](https://github.com/endurodave/DelegateMQ) | The asynchronous delegate library used by this project for active-object dispatch, type-safe multicast delegates, and pub/sub signals. |
+| [**State Machine Design in C++**](https://github.com/endurodave/StateMachine) | A compact C++ language finite state machine (FSM) implementation. |
+| [**DelegateMQ**](https://github.com/endurodave/DelegateMQ) | A messaging middleware that provides a thread-safe way to communicate between objects across thread, process, or network boundaries. It provides the asynchronous dispatch and pub/sub signals used by this project. |
 
 
 # Getting Started
@@ -76,9 +78,9 @@ build\Debug\StateMachineApp.exe  # Windows
 
 # Introduction
 
-In 2000, I wrote an article entitled "*State Machine Design in C++*" for C/C++ Users Journal (R.I.P.). Interestingly, that old article is still available and (at the time of writing this article) the #1 hit on Google when searching for C++ state machine. The article was written over 25 years ago, but I continue to use the basic idea on numerous projects. It's compact, easy to understand and, in most cases, has just enough features to accomplish what I need.
+In 2000, I wrote an article entitled "*State Machine Design in C++*" for C/C++ Users Journal (R.I.P.). The article was written over 25 years ago, but I continue to use the basic idea on numerous projects. It's compact, easy to understand and, in most cases, has just enough features to accomplish what I need.
 
-This implementation updates the classic design with modern DelegateMQ features. It uses a compact table-driven core that makes the original design so practical for embedded and PC targets alike, while adding publisher/subscriber signals and an optional asynchronous active-object mode.
+This new 2026 implementation updates the classic design with modern DelegateMQ features. It uses a compact table-driven core that makes the original design so practical for embedded and PC targets alike, while adding publisher/subscriber signals and an optional asynchronous active-object mode.
 
 This state machine has the following features:
 
@@ -91,28 +93,28 @@ This state machine has the following features:
 7. **Async active-object mode** – calling `SetThread()` enables active-object dispatch; `ExternalEvent()` marshals to the SM thread and returns immediately.
 8. **State machine inheritance** – supports inheriting states from a base state machine class.
 9. **Type safe** – compile-time checks via templates and macros catch signature mismatches.
+10. **Modern C++** – uses `uint8_t`, `bool`, and `std::shared_ptr` for better safety and clarity.
 
 ## Background
 
 A common design technique in the repertoire of most programmers is the venerable finite state machine (FSM). Designers use this programming construct to break complex problems into manageable states and state transitions. There are innumerable ways to implement a state machine.
 
-A switch statement provides one of the easiest to implement and most common version of a state machine. Here, each case within the switch statement becomes a state, implemented something like:
+## State Machine Comparison
 
-```cpp
-switch (currentState) {
-   case ST_IDLE:
-       // do something in the idle state
-       break;
-    case ST_STOP:
-       // do something in the stop state
-       break;
-    // etc...
-}
-```
+The table below highlights the architectural evolution from the [original](https://github.com/endurodave/StateMachine) design to this [modern](https://github.com/endurodave/delegate-fsm) implementation.
 
-This method is certainly appropriate for solving many different design problems. When employed on an event driven, multithreaded project, however, state machines of this form can be quite limiting.
-
-The first problem revolves around controlling what state transitions are valid and which ones are invalid. There is no way to enforce the state transition rules. Any transition is allowed at any time, which is not particularly desirable. For most designs, only a few transition patterns are valid. Ideally, the software design should enforce these predefined state sequences and prevent the unwanted transitions. Another problem arises when trying to send data to a specific state. Since the entire state machine is located within a single function, sending additional data to any given state proves difficult. And lastly these designs are rarely suitable for use in a multithreaded system. The designer must ensure the state machine is called from a single thread of control.
+| Feature | Original FSM | Modern FSM |
+| :--- | :--- | :--- |
+| **Event Data Management** | Raw Pointers (Manual `delete`) | `std::shared_ptr` (RAII/Automatic) |
+| **Async Support** | Synchronous only | Built-in Active Object (`SetThread`) |
+| **Notification** | Subclassing / Virtual functions | Pub/Sub Signals (`OnTransition`, etc.) |
+| **Thread Safety** | None (Caller responsibility) | Structural (via DelegateMQ dispatch) |
+| **Memory Allocation** | Global Heap (`new`/`delete`) | Fixed-block Pools (`XALLOCATOR`) |
+| **State Storage** | Static Table (Memory efficient) | Static Table (Memory efficient) |
+| **Language Standard** | Pre-C++98 / C++98 | C++17 |
+| **Type Safety** | `dynamic_cast` | `std::static_pointer_cast` + `ASSERT` |
+| **Dependencies** | None | DelegateMQ |
+| **Compile-time Checks** | `C_ASSERT` (Macro-based) | `static_assert` (Language-native) |
 
 ## Why use a state machine?
 
@@ -160,11 +162,12 @@ When an event is generated, it can optionally attach event data to be used by th
 class EventData {
 public:
     virtual ~EventData() = default;
+    XALLOCATOR
 };
 using NoEventData = EventData;
 ```
 
-The state machine takes ownership of the `EventData` pointer and deletes it after the transition is processed. (Note: if the fixed-block allocator is enabled, `operator new` and `delete` will use the pool allocator). All event data passed to `ExternalEvent()` must be created on the heap using `operator new`.
+The state machine uses `std::shared_ptr<const EventData>` to manage event data lifetime automatically via RAII.
 
 ## State transitions
 
@@ -195,8 +198,8 @@ public:
     dmq::Signal<void(uint8_t state)> OnCannotHappen;
 
 protected:
-    void ExternalEvent(uint8_t newState, const EventData* pData = nullptr);
-    void InternalEvent(uint8_t newState, const EventData* pData = nullptr);
+    void ExternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData = nullptr);
+    void InternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData = nullptr);
 };
 ```
 
@@ -204,7 +207,7 @@ protected:
 
 ## State functions
 
-State functions implement each state — one state function per state-machine state. All state functions follow the signature `void ST_Name(const DataType*)`.
+State functions implement each state — one state function per state-machine state. All state functions follow the signature `void ST_Name(std::shared_ptr<const DataType>)`.
 
 ```cpp
 STATE_DEFINE(Motor, Start, MotorData)
@@ -252,10 +255,10 @@ The state engine executes state functions based upon events generated. `StateEng
 
 # Generating events
 
-External events are generated by creating event data on the heap, populating its fields, and calling the external event function.
+External events are generated by creating event data using `xmake_shared` (or `std::make_shared`), populating its fields, and calling the external event function.
 
 ```cpp
-auto data = new MotorData();
+auto data = xmake_shared<MotorData>();
 data->speed = 100;
 motor.SetSpeed(data);
 ```
@@ -285,7 +288,7 @@ Thread smThread("MotorSMThread");
 smThread.CreateThread();
 
 motor.SetThread(smThread);
-motor.SetSpeed(new MotorData(100)); // returns immediately
+motor.SetSpeed(xmake_shared<MotorData>(100)); // returns immediately
 ```
 
 # State machine inheritance
@@ -305,7 +308,7 @@ void SelfTest::Cancel()
 State functions can be overridden in the derived class. The derived class may call the base implementation if desired.
 
 ```cpp
-void CentrifugeTest::ST_Idle(const NoEventData* data)
+void CentrifugeTest::ST_Idle(std::shared_ptr<const NoEventData> data)
 {
     cout << "CentrifugeTest::ST_Idle" << endl;
     SelfTest::ST_Idle(data);   // call base class Idle
@@ -318,7 +321,7 @@ Structural thread safety is provided via active-object dispatch; no explicit loc
 
 # Fixed-block allocator
 
-This project includes an optional fixed-block pool allocator, `xallocator`. When `DMQ_ALLOCATOR` is enabled, `xmake_shared` allocates memory from pre-sized pools.
+This project includes an optional fixed-block pool allocator, `xallocator`. When `DMQ_ALLOCATOR` is enabled, `xmake_shared` allocates memory from pre-sized pools. Using `std::shared_ptr` with `xmake_shared` ensures that both the object and the `shared_ptr` control block are allocated from the fixed-block pool.
 
 # Comparison with other libraries
 
@@ -336,9 +339,7 @@ The table below compares this implementation against several widely used C++ sta
 | State machine inheritance | ✓ | — | ✓ | — | — | ✓ |
 | Built-in async active-object | ✓ | — | — | — | — | ✓ |
 | Pub/sub signals (OnTransition etc.) | ✓ | — | — | — | — | — |
-| `shared_ptr` event data (async safe) | — | — | — | — | — | — |
-| Validate() at startup | — | — | — | — | — | — |
-| C++17 standard only | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `shared_ptr` event data (async safe) | ✓ | — | — | — | — | — |
 | Hierarchical SM (HSM) | — | ✓ | ✓ | — | — | ✓ |
 | Compile-time transition checking | partial | ✓ | — | ✓ | ✓ | — |
 
@@ -364,4 +365,4 @@ QP/C++ is a full embedded RTOS framework built around hierarchical active object
 
 ### Summary
 
-This implementation occupies the practical middle ground. It is compact and embedded-friendly like TinyFSM and SML, supports guards/entry/exit/inheritance like Boost.MSM and QP/C++, and uniquely adds a built-in async active-object mode and pub/sub signals that none of the others provide out of the box. Runtime delegate registration keeps the syntax straightforward — state functions are plain member functions with no special macros or template parameter packs — while the typed delegate adapters still catch signature errors at compile time. For projects that need a capable FSM without adopting a full framework or wrestling with heavy template metaprogramming, this design hits a practical sweet spot.
+This implementation occupies the practical middle ground. It maintains the memory efficiency of the classic table-driven design but modernizes it with `std::shared_ptr` for safety and DelegateMQ for powerful async and observation features. It is compact, embedded-friendly, and uniquely adds a built-in async active-object mode and pub/sub signals that none of the others provide out of the box.

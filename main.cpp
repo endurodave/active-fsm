@@ -44,6 +44,9 @@ int main()
 
     Motor syncMotor;
 
+    printf("Size of StateMapRowEx: %zu bytes\n", sizeof(StateMapRowEx));
+    printf("Size of Motor: %zu bytes\n", sizeof(Motor));
+
     // OnTransition fires after every completed state action.
     // fromState == toState indicates a self-transition.
     auto syncConn = syncMotor.OnTransition.Connect(
@@ -75,10 +78,10 @@ int main()
                 cerr << "  [CANNOT_HAPPEN from state " << (int)state << "]" << endl;
             })));
 
-    auto d1 = new MotorData(); d1->speed = 100;
+    auto d1 = xmake_shared<MotorData>(); d1->speed = 100;
     syncMotor.SetSpeed(d1);   // blocks — state executes before returning
 
-    auto d2 = new MotorData(); d2->speed = 200;
+    auto d2 = xmake_shared<MotorData>(); d2->speed = 200;
     syncMotor.SetSpeed(d2);
 
     syncMotor.Halt();
@@ -105,11 +108,11 @@ int main()
                 cout << "  [async transition " << (int)from << " -> " << (int)to << "]" << endl;
             })));
 
-    auto a1 = new MotorData(); a1->speed = 100;
+    auto a1 = xmake_shared<MotorData>(); a1->speed = 100;
     cout << "Posting SetSpeed(100)..." << endl;
     asyncMotor.SetSpeed(a1);   // returns immediately; SM thread processes asynchronously
 
-    auto a2 = new MotorData(); a2->speed = 200;
+    auto a2 = xmake_shared<MotorData>(); a2->speed = 200;
     cout << "Posting SetSpeed(200)..." << endl;
     asyncMotor.SetSpeed(a2);
 

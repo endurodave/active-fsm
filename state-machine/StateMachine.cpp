@@ -18,14 +18,11 @@ StateMachine::StateMachine(uint8_t maxStates, uint8_t initialState) :
 //----------------------------------------------------------------------------
 // ExternalEvent
 //----------------------------------------------------------------------------
-void StateMachine::ExternalEvent(uint8_t newState, const EventData* pData)
+void StateMachine::ExternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData)
 {
     // If we are supposed to ignore this event
     if (newState == EVENT_IGNORED)
     {
-        // Just delete the event data, if any
-        if (pData != nullptr)
-            delete pData;
     }
     else
     {
@@ -37,23 +34,18 @@ void StateMachine::ExternalEvent(uint8_t newState, const EventData* pData)
 
         if (m_smThread)
         {
-            // Pass the pointer as a uintptr_t to bypass DelegateMQ's pointer logic.
-            // DelegateMQ will clone the uintptr_t (a number), not the EventData object.
-            // This prevents slicing and double deletion.
-            MakeDelegate(this, &StateMachine::ExternalEventImpl, *m_smThread)(newState, reinterpret_cast<uintptr_t>(pData));
+            MakeDelegate(this, &StateMachine::ExternalEventImpl, *m_smThread)(newState, pData);
         }
         else
-            ExternalEventImpl(newState, reinterpret_cast<uintptr_t>(pData));
+            ExternalEventImpl(newState, pData);
     }
 }
 
 //----------------------------------------------------------------------------
 // ExternalEventImpl
 //----------------------------------------------------------------------------
-void StateMachine::ExternalEventImpl(uint8_t newState, uintptr_t pDataPtr)
+void StateMachine::ExternalEventImpl(uint8_t newState, std::shared_ptr<const EventData> pData)
 {
-    const EventData* pData = reinterpret_cast<const EventData*>(pDataPtr);
-
     // Generate the event
     InternalEvent(newState, pData);
 
@@ -65,10 +57,10 @@ void StateMachine::ExternalEventImpl(uint8_t newState, uintptr_t pDataPtr)
 //----------------------------------------------------------------------------
 // InternalEvent
 //----------------------------------------------------------------------------
-void StateMachine::InternalEvent(uint8_t newState, const EventData* pData)
+void StateMachine::InternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData)
 {
     if (pData == nullptr)
-        pData = new NoEventData();
+        pData = xmake_shared<NoEventData>();
 
     m_pEventData = pData;
     m_eventGenerated = true;
@@ -98,7 +90,7 @@ void StateMachine::StateEngine(void)
 //----------------------------------------------------------------------------
 void StateMachine::StateEngine(const StateMapRow* const pStateMap)
 {
-    const EventData* pDataTemp = nullptr;	
+    std::shared_ptr<const EventData> pDataTemp = nullptr;	
 
     // While events are being generated keep executing states
     while (m_eventGenerated)
@@ -129,13 +121,6 @@ void StateMachine::StateEngine(const StateMapRow* const pStateMap)
 
         // Fire transition signal
         OnTransition(fromState, m_currentState);
-
-        // If event data was used, then delete it
-        if (pDataTemp)
-        {
-            delete pDataTemp;
-            pDataTemp = nullptr;
-        }
     }
 }
 
@@ -144,7 +129,7 @@ void StateMachine::StateEngine(const StateMapRow* const pStateMap)
 //----------------------------------------------------------------------------
 void StateMachine::StateEngine(const StateMapRowEx* const pStateMapEx)
 {
-    const EventData* pDataTemp = nullptr;
+    std::shared_ptr<const EventData> pDataTemp = nullptr;
 
     // While events are being generated keep executing states
     while (m_eventGenerated)
@@ -209,13 +194,6 @@ void StateMachine::StateEngine(const StateMapRowEx* const pStateMapEx)
 
             // Fire transition signal
             OnTransition(fromState, m_currentState);
-        }
-
-        // If event data was used, then delete it
-        if (pDataTemp)
-        {
-            delete pDataTemp;
-            pDataTemp = nullptr;
         }
     }
 }

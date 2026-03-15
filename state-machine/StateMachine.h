@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <typeinfo>
+#include <memory>
 #include "delegate-mq/DelegateMQ.h"
 #include "delegate-mq/predef/util/Fault.h"
 
@@ -26,25 +27,25 @@ public:
     /// exists and it evaluates to false, the state action will not execute. 
     /// @param[in] sm - A state machine instance. 
     /// @param[in] data - The event data. 
-    virtual void InvokeStateAction(StateMachine* sm, const EventData* data) const = 0;
+    virtual void InvokeStateAction(StateMachine* sm, std::shared_ptr<const EventData> data) const = 0;
 };
 
 /// @brief StateAction takes three template arguments: A state machine class,
 /// a state function event data type (derived from EventData) and a state machine 
 /// member function pointer.  
-template <class SM, class Data, void (SM::*Func)(const Data*)>
+template <class SM, class Data, void (SM::*Func)(std::shared_ptr<const Data>)>
 class StateAction : public StateBase
 {
 public:
     /// @see StateBase::InvokeStateAction
-    virtual void InvokeStateAction(StateMachine* sm, const EventData* data) const override
+    virtual void InvokeStateAction(StateMachine* sm, std::shared_ptr<const EventData> data) const override
     {
         // Downcast the state machine and event data to the correct derived type
         SM* derivedSM = static_cast<SM*>(sm);
         
         // If this check fails, there is a mismatch between the STATE_DECLARE 
         // event data type and the data type being sent to the state function. 
-        const Data* derivedData = dynamic_cast<const Data*>(data);
+        std::shared_ptr<const Data> derivedData = std::static_pointer_cast<const Data>(data);
         ASSERT_TRUE(derivedData != nullptr);
 
         // Call the state function
@@ -62,20 +63,20 @@ public:
     /// @param[in] sm - A state machine instance. 
     /// @param[in] data - The event data. 
     /// @return Returns true if no guard condition or the guard condition evaluates to true.
-    virtual bool InvokeGuardCondition(StateMachine* sm, const EventData* data) const = 0;
+    virtual bool InvokeGuardCondition(StateMachine* sm, std::shared_ptr<const EventData> data) const = 0;
 };
 
 /// @brief GuardCondition takes three template arguments: A state machine class,
 /// a state function event data type (derived from EventData) and a state machine 
 /// member function pointer. 
-template <class SM, class Data, bool (SM::*Func)(const Data*)>
+template <class SM, class Data, bool (SM::*Func)(std::shared_ptr<const Data>)>
 class GuardCondition : public GuardBase
 {
 public:
-    virtual bool InvokeGuardCondition(StateMachine* sm, const EventData* data) const override
+    virtual bool InvokeGuardCondition(StateMachine* sm, std::shared_ptr<const EventData> data) const override
     {
         SM* derivedSM = static_cast<SM*>(sm);		
-        const Data* derivedData = dynamic_cast<const Data*>(data);
+        std::shared_ptr<const Data> derivedData = std::static_pointer_cast<const Data>(data);
         ASSERT_TRUE(derivedData != nullptr);
 
         // Call the guard function
@@ -91,20 +92,20 @@ public:
     /// entering a state. 
     /// @param[in] sm - A state machine instance. 
     /// @param[in] data - The event data.
-    virtual void InvokeEntryAction(StateMachine* sm, const EventData* data) const = 0;
+    virtual void InvokeEntryAction(StateMachine* sm, std::shared_ptr<const EventData> data) const = 0;
 };
 
 /// @brief EntryAction takes three template arguments: A state machine class,
 /// a state function event data type (derived from EventData) and a state machine 
 /// member function pointer.  
-template <class SM, class Data, void (SM::*Func)(const Data*)>
+template <class SM, class Data, void (SM::*Func)(std::shared_ptr<const Data>)>
 class EntryAction : public EntryBase
 {
 public:
-    virtual void InvokeEntryAction(StateMachine* sm, const EventData* data) const override
+    virtual void InvokeEntryAction(StateMachine* sm, std::shared_ptr<const EventData> data) const override
     {
         SM* derivedSM = static_cast<SM*>(sm);
-        const Data* derivedData = dynamic_cast<const Data*>(data);
+        std::shared_ptr<const Data> derivedData = std::static_pointer_cast<const Data>(data);
         ASSERT_TRUE(derivedData != nullptr);
 
         // Call the entry function
@@ -194,13 +195,13 @@ protected:
     /// External state machine event.
     /// @param[in] newState - the state machine state to transition to.
     /// @param[in] pData - the event data sent to the state.
-    void ExternalEvent(uint8_t newState, const EventData* pData = nullptr);
+    void ExternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData = nullptr);
 
     /// Internal state machine event. These events are generated while executing
     ///	within a state machine state.
     /// @param[in] newState - the state machine state to transition to.
     /// @param[in] pData - the event data sent to the state.
-    void InternalEvent(uint8_t newState, const EventData* pData = nullptr);
+    void InternalEvent(uint8_t newState, std::shared_ptr<const EventData> pData = nullptr);
 	
 private:
     /// The maximum number of state machine states.
@@ -216,7 +217,7 @@ private:
     bool m_eventGenerated;
 
     /// The state event data pointer.
-    const EventData* m_pEventData;
+    std::shared_ptr<const EventData> m_pEventData;
 
     /// Optional SM thread. Non-null enables active-object async dispatch.
     dmq::IThread* m_smThread = nullptr;
@@ -242,7 +243,7 @@ private:
     void SetCurrentState(uint8_t newState) { m_currentState = newState; }
 
     /// ExternalEvent execution helper.
-    void ExternalEventImpl(uint8_t newState, uintptr_t pDataPtr);
+    void ExternalEventImpl(uint8_t newState, std::shared_ptr<const EventData> pData);
 
     /// State machine engine that executes the external event and, optionally, all 
     /// internal events generated during state execution.
@@ -252,25 +253,25 @@ private:
 };
 
 #define STATE_DECLARE(stateMachine, stateName, eventData) \
-    void ST_##stateName(const eventData*); \
+    void ST_##stateName(std::shared_ptr<const eventData>); \
     inline static StateAction<stateMachine, eventData, &stateMachine::ST_##stateName> stateName;
 	
 #define STATE_DEFINE(stateMachine, stateName, eventData) \
-    void stateMachine::ST_##stateName(const eventData* data)
+    void stateMachine::ST_##stateName(std::shared_ptr<const eventData> data)
 		
 #define GUARD_DECLARE(stateMachine, guardName, eventData) \
-    bool GD_##guardName(const eventData*); \
+    bool GD_##guardName(std::shared_ptr<const eventData>); \
     inline static GuardCondition<stateMachine, eventData, &stateMachine::GD_##guardName> guardName;
 	
 #define GUARD_DEFINE(stateMachine, guardName, eventData) \
-    bool stateMachine::GD_##guardName(const eventData* data)
+    bool stateMachine::GD_##guardName(std::shared_ptr<const eventData> data)
 
 #define ENTRY_DECLARE(stateMachine, entryName, eventData) \
-    void EN_##entryName(const eventData*); \
+    void EN_##entryName(std::shared_ptr<const eventData>); \
     inline static EntryAction<stateMachine, eventData, &stateMachine::EN_##entryName> entryName;
 	
 #define ENTRY_DEFINE(stateMachine, entryName, eventData) \
-    void stateMachine::EN_##entryName(const eventData* data)
+    void stateMachine::EN_##entryName(std::shared_ptr<const eventData> data)
 
 #define EXIT_DECLARE(stateMachine, exitName) \
     void EX_##exitName(void); \
