@@ -11,9 +11,8 @@ A compact, table-driven C++ finite state machine (FSM) with asynchronous active-
 
 - [State Machine Design in C++](#state-machine-design-in-c)
 - [Table of Contents](#table-of-contents)
-- [Preface](#preface)
-  - [Related repositories](#related-repositories)
 - [Getting Started](#getting-started)
+  - [Related repositories](#related-repositories)
 - [Introduction](#introduction)
   - [DelegateMQ Integration](#delegatemq-integration)
   - [Why use a state machine?](#why-use-a-state-machine)
@@ -44,19 +43,6 @@ A compact, table-driven C++ finite state machine (FSM) with asynchronous active-
     - [Summary](#summary)
 
 
-# Preface
-
-Based on original article "State Machine Design in C++" published in C\C++ Users Journal (Dr. Dobb's) May 2000.
-
-## Related repositories
-
-| Project | Description |
-| :--- | :--- |
-| [**State Machine Design in C**](https://github.com/endurodave/C_StateMachine) | A compact C language finite state machine (FSM) implementation. |
-| [**State Machine Design in C++**](https://github.com/endurodave/StateMachine) | A compact C++ language finite state machine (FSM) implementation. |
-| [**DelegateMQ**](https://github.com/endurodave/DelegateMQ) | A messaging middleware providing RAII-safe asynchronous dispatch and pub/sub signals. |
-
-
 # Getting Started
 
 [CMake](https://cmake.org/) is used to create the project build files on any Windows or Linux machine. The state machine source code works on any C++ compiler on any platform.
@@ -71,6 +57,14 @@ build\Debug\StateMachineApp.exe  # Windows
 ```
 
 `StateMachineApp` runs all example state machines and unit tests on launch and outputs results to stdout.
+
+## Related repositories
+
+| Project | Description |
+| :--- | :--- |
+| [**State Machine Design in C**](https://github.com/endurodave/C_StateMachine) | A compact C language finite state machine (FSM) implementation. |
+| [**State Machine Design in C++**](https://github.com/endurodave/StateMachine) | A compact C++ language finite state machine (FSM) implementation. |
+| [**DelegateMQ**](https://github.com/endurodave/DelegateMQ) | A messaging middleware providing RAII-safe asynchronous dispatch and pub/sub signals. |
 
 # Introduction
 
