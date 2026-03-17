@@ -15,8 +15,6 @@ A compact, table-driven C++ finite state machine (FSM) with asynchronous active-
   - [Related repositories](#related-repositories)
 - [Getting Started](#getting-started)
 - [Introduction](#introduction)
-  - [Background](#background)
-  - [State Machine Comparison](#state-machine-comparison)
   - [DelegateMQ Integration](#delegatemq-integration)
   - [Why use a state machine?](#why-use-a-state-machine)
 - [State machine design](#state-machine-design)
@@ -36,6 +34,7 @@ A compact, table-driven C++ finite state machine (FSM) with asynchronous active-
 - [State function inheritance](#state-function-inheritance)
 - [Multithread safety](#multithread-safety)
 - [Fixed-block allocator](#fixed-block-allocator)
+- [State Machine Comparison](#state-machine-comparison)
 - [Comparison with other libraries](#comparison-with-other-libraries)
     - [Boost.MSM](#boostmsm)
     - [Boost.Statechart](#booststatechart)
@@ -91,28 +90,6 @@ This state machine has the following features:
 8. **State machine inheritance** – supports inheriting states from a base state machine class.
 9. **Type safe** – compile-time checks via templates and macros catch signature mismatches.
 10. **Modern C++** – uses `uint8_t`, `bool`, and `std::shared_ptr` for better safety and clarity.
-
-## Background
-
-A common design technique in the repertoire of most programmers is the venerable finite state machine (FSM). Designers use this programming construct to break complex problems into manageable states and state transitions. There are innumerable ways to implement a state machine.
-
-## State Machine Comparison
-
-The table below highlights the architectural evolution from the [original](https://github.com/endurodave/StateMachine) design to this [modern](https://github.com/endurodave/delegate-fsm) implementation.
-
-| Feature | Original FSM | Modern FSM |
-| :--- | :--- | :--- |
-| **Event Data Management** | Raw Pointers (Manual `delete`) | `std::shared_ptr` (RAII/Automatic) |
-| **Async Support** | Synchronous only | Built-in Active Object (`SetThread`) |
-| **Notification** | Subclassing / Virtual functions | Pub/Sub Signals (`OnTransition`, etc.) |
-| **Thread Safety** | None (Caller responsibility) | Structural (via DelegateMQ dispatch) |
-| **Memory Allocation** | Global Heap (`new`/`delete`) | Fixed-block Pools (`XALLOCATOR`) |
-| **State Storage** | Static Table (Memory efficient) | Static Table (Memory efficient) |
-| **Language Standard** | Pre-C++98 / C++98 | C++17 |
-| **Type Safety** | `dynamic_cast` | `std::static_pointer_cast` + `ASSERT` |
-| **Dependencies** | None | DelegateMQ |
-| **Integer Types** | `BYTE` / `BOOL` (Platform specific) | `uint8_t` / `bool` (Standard C++) |
-| **Compile-time Checks** | `C_ASSERT` (Macro-based) | `static_assert` (Language-native) |
 
 ## DelegateMQ Integration
 
@@ -330,6 +307,24 @@ Structural thread safety is provided via active-object dispatch; no explicit loc
 # Fixed-block allocator
 
 This project includes an optional fixed-block pool allocator, `xallocator`. When `DMQ_ALLOCATOR` is enabled, `xmake_shared` allocates memory from pre-sized pools. Using `std::shared_ptr` with `xmake_shared` ensures that both the object and the `shared_ptr` control block are allocated from the fixed-block pool.
+
+# State Machine Comparison
+
+The table below highlights the architectural evolution from the [original](https://github.com/endurodave/StateMachine) design to this [modern](https://github.com/endurodave/async-fsm) implementation.
+
+| Feature | Original FSM | Modern FSM |
+| :--- | :--- | :--- |
+| **Event Data Management** | Raw Pointers (Manual `delete`) | `std::shared_ptr` (RAII/Automatic) |
+| **Async Support** | Synchronous only | Built-in Active Object (`SetThread`) |
+| **Notification** | Subclassing / Virtual functions | Pub/Sub Signals (`OnTransition`, etc.) |
+| **Thread Safety** | None (Caller responsibility) | Structural (via DelegateMQ dispatch) |
+| **Memory Allocation** | Global Heap (`new`/`delete`) | Fixed-block Pools (`XALLOCATOR`) |
+| **State Storage** | Static Table (Memory efficient) | Static Table (Memory efficient) |
+| **Language Standard** | Pre-C++98 / C++98 | C++17 |
+| **Type Safety** | `dynamic_cast` | `std::static_pointer_cast` + `ASSERT` |
+| **Dependencies** | None | DelegateMQ |
+| **Integer Types** | `BYTE` / `BOOL` (Platform specific) | `uint8_t` / `bool` (Standard C++) |
+| **Compile-time Checks** | `C_ASSERT` (Macro-based) | `static_assert` (Language-native) |
 
 # Comparison with other libraries
 
