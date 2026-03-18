@@ -61,10 +61,7 @@ public:
         // Downcast the state machine and event data to the correct derived type
         SM* derivedSM = static_cast<SM*>(sm);
         
-        // If this check fails, there is a mismatch between the STATE_DECLARE 
-        // event data type and the data type being sent to the state function. 
         std::shared_ptr<const Data> derivedData = std::static_pointer_cast<const Data>(data);
-        ASSERT_TRUE(derivedData != nullptr);
 
         // Call the state function
         (derivedSM->*Func)(derivedData);
@@ -193,7 +190,7 @@ public:
     uint8_t GetMaxStates() const { return MAX_STATES; }
 
     /// Enable active-object mode. ExternalEvent will marshal to @p thread.
-    /// Call before the first ExternalEvent. 
+    /// Call before the first ExternalEvent.
     void SetThread(dmq::IThread& thread) { m_thread = &thread; }
 
     /// Fired after every completed state action: (fromState, toState).

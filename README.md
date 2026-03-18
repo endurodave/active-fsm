@@ -3,13 +3,13 @@
 [![conan Ubuntu](https://github.com/endurodave/StateMachine/actions/workflows/cmake_clang.yml/badge.svg)](https://github.com/endurodave/StateMachine/actions/workflows/cmake_clang.yml)
 [![conan Windows](https://github.com/endurodave/StateMachine/actions/workflows/cmake_windows.yml/badge.svg)](https://github.com/endurodave/StateMachine/actions/workflows/cmake_windows.yml)
 
-# State Machine Design in C++
+# Active-Object State Machine in C++
 
 A compact, table-driven C++ finite state machine (FSM) with asynchronous active-object and signal-slot event notification. Extensively unit tested. Runs on embedded and PC targets, any operating system.
 
 # Table of Contents
 
-- [State Machine Design in C++](#state-machine-design-in-c)
+- [Active-Object State Machine in C++](#active-object-state-machine-in-c)
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
   - [Related repositories](#related-repositories)
@@ -304,7 +304,7 @@ This project includes an optional fixed-block pool allocator, `xallocator`. When
 
 # State Machine Comparison
 
-The table below highlights the architectural evolution from the [original](https://github.com/endurodave/StateMachine) design to this [modern](https://github.com/endurodave/async-fsm) implementation.
+The table below highlights the architectural evolution from the [original](https://github.com/endurodave/StateMachine) design to this [modern](https://github.com/endurodave/active-fsm) implementation.
 
 | Feature | Original FSM | Modern FSM |
 | :--- | :--- | :--- |

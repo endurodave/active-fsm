@@ -1,6 +1,4 @@
 #include "StateMachine.h"
-#include "delegate-mq/predef/os/stdlib/Thread.h"
-#include <thread>
 
 using namespace dmq;
 
@@ -76,12 +74,7 @@ bool StateMachine::IsOnStateMachineThread() const
 {
     if (!m_thread)
         return true;
-
-    // GetThreadId() is not a const member in Thread class, so we cast to non-const Thread*.
-    // Since m_thread is a pointer member, we can still call non-const methods on the 
-    // pointed-to object even from a const StateMachine method.
-    Thread* thread = static_cast<Thread*>(m_thread);
-    return thread->GetThreadId() == Thread::GetCurrentThreadId();
+    return m_thread->IsCurrentThread();
 }
 
 //----------------------------------------------------------------------------
